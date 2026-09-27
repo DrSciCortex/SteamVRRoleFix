@@ -1,0 +1,60 @@
+<!--
+SPDX-FileCopyrightText: 2026 DrSciCortex
+
+SPDX-License-Identifier: MIT
+-->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- A plugin for Resonite's Unity renderer (Mono), loaded by BepInEx 5 (ResoniteModding-BepInExRenderer). -->
+  <PropertyGroup>
+    <Version>0.2.0</Version>
+    <TargetFramework>net472</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>SteamVRRoleFix</AssemblyName>
+    <RootNamespace>SteamVRRoleFix</RootNamespace>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <Deterministic>true</Deterministic>
+    <GamePath Condition="'$(ResonitePath)' != ''">$(ResonitePath)/</GamePath>
+    <GamePath Condition="'$(GamePath)' == '' and Exists('$(MSBuildProgramFiles32)\Steam\steamapps\common\Resonite\')">$(MSBuildProgramFiles32)\Steam\steamapps\common\Resonite\</GamePath>
+    <GamePath Condition="'$(GamePath)' == '' and Exists('$(HOME)/.steam/steam/steamapps/common/Resonite/')">$(HOME)/.steam/steam/steamapps/common/Resonite/</GamePath>
+    <RendererManaged>$(GamePath)Renderer\Renderite.Renderer_Data\Managed\</RendererManaged>
+    <!-- The mod profile with BepInExRenderer: Gale's Default profile if present, else the game folder. -->
+    <ModProfilePath Condition="'$(ModProfilePath)' == '' and Exists('$(APPDATA)\com.kesomannen.gale\resonite\profiles\Default\Renderer\BepInEx')">$(APPDATA)\com.kesomannen.gale\resonite\profiles\Default\</ModProfilePath>
+    <ModProfilePath Condition="'$(ModProfilePath)' == ''">$(GamePath)</ModProfilePath>
+    <BepInExCore Condition="'$(BepInExCore)' == ''">$(ModProfilePath)Renderer\BepInEx\core\</BepInExCore>
+  </PropertyGroup>
+
+  <!-- Reference only, never redistributed: BepInEx 5 and HarmonyX (from the installed BepInExRenderer), Unity,
+       Valve's SteamVR plugin and the renderer itself. -->
+  <ItemGroup>
+    <Reference Include="BepInEx">
+      <HintPath>$(BepInExCore)BepInEx.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="0Harmony">
+      <HintPath>$(BepInExCore)0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine">
+      <HintPath>$(RendererManaged)UnityEngine.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>$(RendererManaged)UnityEngine.CoreModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="SteamVR">
+      <HintPath>$(RendererManaged)SteamVR.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <!-- dotnet build -p:Deploy=true: copy into the mod profile's renderer plugins. -->
+  <PropertyGroup>
+    <PluginTargetDir>$(ModProfilePath)Renderer\BepInEx\plugins\DrSciCortex-SteamVRRoleFix</PluginTargetDir>
+  </PropertyGroup>
+  <Target Name="Deploy" AfterTargets="Build" Condition="'$(Deploy)' == 'true'">
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(PluginTargetDir)" />
+    <Message Text="Deployed $(TargetName) to $(PluginTargetDir)" Importance="high" />
+  </Target>
+</Project>
