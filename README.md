@@ -22,7 +22,7 @@ switching Resonite from desktop to VR, or going in and out of the Quest menus, c
 
 There's a second problem. The renderer turns any controller that connects without a role into a tracker, so a hand
 controller that is waiting for its hand becomes a tracker. Resonite then draws a tracker model on your hand. Waiting
-for the hand happens to a glove taking the hand back, or to the headset's hand tracking while controllers hold it.
+for the hand happens to a CyberFinger taking the hand back, or to the headset's hand tracking while controllers hold it.
 If that device later becomes the hand's controller, the renderer removes its tracker by serial number. SteamVR may
 report a different serial by then (controller emulation), so the tracker stays.
 

@@ -277,7 +277,7 @@ namespace SteamVRRoleFix
     /// <summary>
     /// The renderer maps a controller that connects without a role as a tracker. A controller with a hand role hint
     /// that has no role yet is waiting for its hand (a CyberFinger taking the hand back, the headset's hand tracking
-    /// while gloves or controllers hold the hand), not a tracker: it sits on the hand, where Resonite would draw a
+    /// while CyberFingers or controllers hold the hand), not a tracker: it sits on the hand, where Resonite would draw a
     /// tracker model. Those are kept out; RoleFollower registers them once they hold the role.
     /// </summary>
     [HarmonyPatch]
