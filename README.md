@@ -1,7 +1,7 @@
 # SteamVRRoleFix
 
 A plugin for Resonite's renderer (BepInEx 5, [BepInExRenderer](https://thunderstore.io/c/resonite/p/ResoniteModding/BepInExRenderer/)).
-It fixes frozen hands and dead input after switching controllers in SteamVR.
+It fixes frozen hands, dead input and stuck buttons after switching controllers in SteamVR.
 
 ## The problem
 
@@ -26,6 +26,12 @@ for the hand happens to a glove taking the hand back, or to the headset's hand t
 If that device later becomes the hand's controller, the renderer removes its tracker by serial number. SteamVR may
 report a different serial by then (controller emulation), so the tracker stays.
 
+And a third. When a hand switches controllers, the renderer stops reading the old controller but keeps sending
+Resonite its last input state, and Resonite combines the inputs of every controller it has seen on a side. A button
+held at the moment of the switch stays held for the rest of the session. With Touch controllers, a stuck dash button
+on one hand means X or A no longer opens the dash, and a double press of the other hand's button toggles UI edit
+mode instead.
+
 ## The fix
 
 Every 100 ms, the plugin asks SteamVR which device holds each hand role. When the holder is a connected device that
@@ -39,9 +45,13 @@ For the second problem, the plugin also:
 - removes the tracker of any device that is currently a hand's controller, matching by device index rather than
   serial.
 
+For the third, when the renderer marks a controller as no longer read, the plugin clears its inputs too: buttons
+up, triggers, grips and sticks at rest. It logs any input it found held.
+
 The same change, written into the renderer itself, is proposed upstream for
 [Renderite.Unity.Renderer](https://github.com/Yellow-Dog-Man/Renderite.Unity.Renderer). Once that ships, this
-plugin isn't needed. It doesn't get in the way either: it only acts when a hand is on the wrong device.
+plugin isn't needed. It doesn't get in the way either: it only acts when a hand is on the wrong device, or on
+a controller the renderer has stopped reading.
 
 ## Build and install
 

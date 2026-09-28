@@ -26,12 +26,15 @@ namespace SteamVRRoleFix
     /// The renderer also turns a controller that connects without a role into a tracker, and a hand controller waiting
     /// for its hand isn't one: it sits on the hand, where Resonite then draws a tracker model. Controllers with a hand
     /// role hint are kept from becoming trackers (NoHandTrackers), and a hand's controller loses any tracker it has.
+    ///
+    /// A controller the hand switches away from has its inputs cleared (ClearOldInputs): Resonite would otherwise keep
+    /// any button that was held at the switch held.
     /// </summary>
     [BepInPlugin(Guid, "SteamVRRoleFix", Version)]
     public class Plugin : BaseUnityPlugin
     {
         public const string Guid = "com.drscicortex.steamvrrolefix";
-        public const string Version = "0.2.0";
+        public const string Version = "0.3.0";
 
         internal static ManualLogSource Log;
 
@@ -46,7 +49,7 @@ namespace SteamVRRoleFix
             }
             new Harmony(Guid).PatchAll(typeof(Plugin).Assembly);
             Log.LogInfo($"SteamVRRoleFix {Version}: Resonite's hands follow SteamVR's hand roles, hand controllers " +
-                        "never become trackers");
+                        "never become trackers, and a controller switched away from leaves no input held");
         }
     }
 
@@ -201,6 +204,73 @@ namespace SteamVRRoleFix
         {
             if (s_reported.Add(where))
                 Plugin.Log.LogError($"{where} failed (reported once): {e}");
+        }
+    }
+
+    /// <summary>
+    /// When a hand switches controllers, the renderer stops reading the old one but keeps sending its last input state,
+    /// and Resonite combines every controller's inputs on a side. A button held at the switch stays held: a Touch
+    /// controller's dash button held this way keeps X/A from opening the dash, and makes a double X toggle UI edit
+    /// mode. The renderer marks the old controller inactive (ClearActiveStatus); this also clears its inputs.
+    /// </summary>
+    [HarmonyPatch]
+    internal static class ClearOldInputs
+    {
+        private static FieldInfo s_controller, s_deviceId;
+        private static readonly Dictionary<Type, FieldInfo[]> s_inputs = new Dictionary<Type, FieldInfo[]>();
+
+        private static bool Prepare()
+        {
+            Type data = AccessTools.TypeByName("SteamControllerData");
+            s_controller = data != null ? AccessTools.Field(data, "Controller") : null;
+            if (s_controller == null || AccessTools.Method(data, "ClearActiveStatus") == null)
+            {
+                Plugin.Log.LogError("Resonite's renderer has changed (SteamControllerData.Controller/ClearActiveStatus " +
+                                    "not found): not clearing old controllers' inputs");
+                return false;
+            }
+            s_deviceId = AccessTools.Field(s_controller.FieldType, "deviceID");
+            return true;
+        }
+
+        private static MethodBase TargetMethod() =>
+            AccessTools.Method(AccessTools.TypeByName("SteamControllerData"), "ClearActiveStatus");
+
+        private static void Postfix(object __instance)
+        {
+            try
+            {
+                object controller = s_controller.GetValue(__instance);
+                if (controller == null) return;
+                List<string> held = null;
+                foreach (FieldInfo input in InputsOf(controller.GetType()))
+                {
+                    object idle = Activator.CreateInstance(input.FieldType);
+                    if (Equals(input.GetValue(controller), idle)) continue;
+                    (held ??= new List<string>()).Add(input.Name);
+                    input.SetValue(controller, idle);
+                }
+                if (held != null)
+                    Plugin.Log.LogInfo($"{s_deviceId?.GetValue(controller) ?? controller.GetType().Name} is no longer " +
+                                       $"read: cleared its inputs ({string.Join(", ", held.ToArray())})");
+            }
+            catch (Exception e)
+            {
+                RoleFollower.ReportOnce("ClearActiveStatus", e);
+            }
+        }
+
+        // The input fields: the value fields each controller type adds to VR_ControllerState (whose own fields are the
+        // device, pose and battery), less enums such as the Touch model.
+        private static FieldInfo[] InputsOf(Type type)
+        {
+            if (s_inputs.TryGetValue(type, out FieldInfo[] inputs)) return inputs;
+            var found = new List<FieldInfo>();
+            for (Type t = type; t != null && t != s_controller.FieldType; t = t.BaseType)
+                foreach (FieldInfo f in t.GetFields(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly))
+                    if (f.FieldType.IsValueType && !f.FieldType.IsEnum)
+                        found.Add(f);
+            return s_inputs[type] = found.ToArray();
         }
     }
 
